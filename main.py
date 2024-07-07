@@ -534,9 +534,7 @@ def process_video(video_path, output_video_path, trail_video_path, speed_heatmap
         # Draw blinking count ROI on the frame
         draw_blinking_count_roi(frame, blink_state)
 
-        speed_heatmap_data = []
-        count_heatmap_data = []
-
+        speed_heatmap_data = [] 
         # Process each tracked object
         for obj in tracked_objects:
             # Extract object information
@@ -582,6 +580,7 @@ def process_video(video_path, output_video_path, trail_video_path, speed_heatmap
                         elif direction == 'bottom_to_top':
                             crossed = last_pos[1] > count_roi >= centroid_y
 
+                        ### to ensure uniqueness of counting i.e. same object won't be counted twice 
                         if crossed and obj_id not in counted_objects[pos]:
                             crossed_objects[pos] += 1
                             counted_objects[pos].add(obj_id)
@@ -589,7 +588,6 @@ def process_video(video_path, output_video_path, trail_video_path, speed_heatmap
                             blink_frames[pos] = fps
                     
                     last_positions[pos][obj_id] = (centroid_x, centroid_y)
-                    count_heatmap_data.append(((centroid_x, centroid_y), crossed_objects[pos]))
 
         # Update blink states for critical positions
         for pos in blink_state:
