@@ -85,6 +85,12 @@ critical_positions = {
 
 # Function to calculate the count ROI based on critical points
 def calculate_count_roi(points, direction):
+    """
+    This function calculates the count ROI based on critical points and direction
+    - input: points (list of tuples), direction (string)
+    - output: count_roi (int) representing the x or y coordinate of the ROI line
+    """
+
     if direction in ['left_to_right', 'right_to_left']:
         return (points[0][0] + points[2][0]) // 2
     elif direction in ['top_to_bottom', 'bottom_to_top']:
@@ -96,6 +102,11 @@ for pos, data in critical_positions.items():
     data['count_roi'] = calculate_count_roi(data['points'], data['direction'])
 
 def detect_objects(frame):
+    """
+    This function runs detection onf the frame using YOLOv10 model
+    - input: frame
+    - output: detections in [[int(x1), int(y1), int(x2), int(y2), float(conf), int(cls)]]
+    """
     # Use the YOLO model to detect objects in the frame
     results = model(frame)
     
@@ -110,10 +121,21 @@ def detect_objects(frame):
     return np.array(detections) if detections else np.empty((0, 6))
 
 def track_objects(frame, detections):
+    """
+    This function updates object tracks using the OC-SORT tracker
+    - input: frame (numpy array), detections (numpy array)
+    - output: tracked objects
+    """
     # Use the OC-SORT tracker to update object tracks
     return tracker.update(detections, frame)
 
 def crosses_threshold(centroid, threshold, direction):
+    """
+    This function checks if an object has crossed a threshold based on its direction
+    - input: centroid (tuple), threshold (int), direction (string)
+    - output: boolean indicating if threshold is crossed
+    """
+    
     # Check if the object has crossed the threshold based on its direction
     if direction == 'left_to_right':
         return centroid[0] >= threshold
@@ -126,6 +148,11 @@ def crosses_threshold(centroid, threshold, direction):
     return False
 
 def is_inside_critical_location(centroid, points):
+    """
+    This function checks if a point is inside a polygon defined by points
+    - input: centroid (tuple), points (list of tuples)
+    - output: boolean indicating if centroid is inside the polygon
+    """
     # Create a polygon from the given points
     polygon = Polygon(points)
     # Create a point from the centroid
@@ -134,6 +161,12 @@ def is_inside_critical_location(centroid, points):
     return polygon.contains(point)
 
 def draw_blinking_count_roi(frame, blink_state):
+    """
+    This function draws blinking ROI lines on the frame
+    - input: frame (numpy array), blink_state (dict)
+    - output: None (modifies frame in-place)
+    """
+
     for pos, data in critical_positions.items():
         count_roi = data['count_roi']
         # Determine color based on blink state
@@ -152,6 +185,12 @@ def draw_blinking_count_roi(frame, blink_state):
         cv2.putText(frame, f"pos-{pos[-1]}", label_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, roi_color, 2)
 
 def draw_info_on_canvas(canvas, crossed_objects):
+    """
+    This function draws count information and ROI lines on a canvas
+    - input: canvas (numpy array), crossed_objects (dict)
+    - output: None (modifies canvas in-place)
+    """
+
     y_offset = 30
     # Draw count information for each position
     for pos, count in crossed_objects.items():
@@ -169,6 +208,11 @@ def draw_info_on_canvas(canvas, crossed_objects):
             cv2.line(canvas, (points[0][0], count_roi), (points[2][0], count_roi), roi_color, 4)
 
 def get_unique_color():
+    """
+    This function generates a cycle of unique colors
+    - input: None
+    - output: generator yielding unique RGB colors
+    """
     # Create a color map with 20 distinct colors
     colors = plt.cm.get_cmap('tab20', 20)
     color_cycle = cycle(colors(np.linspace(0, 1, 20)))
@@ -179,6 +223,13 @@ def get_unique_color():
 color_generator = get_unique_color()
 
 def plot_trail(canvas, trails, tracked_objects, trail_colors, critical_positions, count_roi_colors, blink_state, crossed_objects):
+    """
+    This function plots object trails and counts on a canvas
+    - input: canvas (numpy array), trails (dict), tracked_objects (list), trail_colors (dict),
+             critical_positions (dict), count_roi_colors (dict), blink_state (dict), crossed_objects (dict)
+    - output: None (modifies canvas in-place)
+    """
+
     for obj in tracked_objects:
         x1, y1, x2, y2, obj_id, _, cls, _ = obj
         centroid_x = int((x1 + x2) / 2)
@@ -200,6 +251,11 @@ def plot_trail(canvas, trails, tracked_objects, trail_colors, critical_positions
     draw_counts_near_roi(canvas, critical_positions, crossed_objects, count_roi_colors)
 
 def combine_frames(frames):
+    """
+    This function combines four frames into a 2x2 grid
+    - input: frames (list of numpy arrays)
+    - output: combined frame (numpy array)
+    """
     # Get the dimensions of the first frame
     height, width = frames[0].shape[:2]
     
@@ -212,6 +268,12 @@ def combine_frames(frames):
     return np.vstack((top_row, bottom_row))
 
 def estimate_speed(prev_pos, curr_pos, fps, pixels_per_meter=10):
+    """
+    This function estimates the speed of an object based on its previous and current positions
+    - input: prev_pos (tuple), curr_pos (tuple), fps (int), pixels_per_meter (int)
+    - output: speed in km/h (float)
+    """
+
     if prev_pos is None:
         return 0
     # Calculate Euclidean distance between current and previous positions
@@ -227,6 +289,12 @@ def estimate_speed(prev_pos, curr_pos, fps, pixels_per_meter=10):
     return speed_kmph
 
 def create_heatmap(frame, heatmap_data, colormap=cv2.COLORMAP_JET):
+    """
+    This function creates a heatmap overlay on a frame
+    - input: frame (numpy array), heatmap_data (list of tuples), colormap (cv2 colormap)
+    - output: frame with heatmap overlay (numpy array)
+    """
+
     # Create an empty heatmap with the same dimensions as the frame
     heatmap = np.zeros(frame.shape[:2], dtype=np.float32)
     # Plot each data point on the heatmap
@@ -241,6 +309,11 @@ def create_heatmap(frame, heatmap_data, colormap=cv2.COLORMAP_JET):
 
 
 def draw_count_roi(frame, critical_positions, count_roi_colors, blink_state):
+    """
+    This function draws count ROI lines on a frame
+    - input: frame (numpy array), critical_positions (dict), count_roi_colors (dict), blink_state (dict)
+    - output: None (modifies frame in-place)
+    """
     for pos, data in critical_positions.items():
         count_roi = data['count_roi']
         points = data['points']
@@ -253,6 +326,12 @@ def draw_count_roi(frame, critical_positions, count_roi_colors, blink_state):
             cv2.line(frame, (points[0][0], count_roi), (points[2][0], count_roi), roi_color, 4)
 
 def draw_count_roi_on_canvas(canvas, critical_positions, count_roi_colors):
+    """
+    This function draws count ROI lines on a canvas
+    - input: canvas (numpy array), critical_positions (dict), count_roi_colors (dict)
+    - output: None (modifies canvas in-place)
+    """
+
     for pos, data in critical_positions.items():
         count_roi = data['count_roi']
         points = data['points']
@@ -264,6 +343,12 @@ def draw_count_roi_on_canvas(canvas, critical_positions, count_roi_colors):
             cv2.line(canvas, (points[0][0], count_roi), (points[2][0], count_roi), roi_color, 2)
 
 def create_speed_dots(frame_shape, tracked_objects, object_speeds):
+    """
+    This function creates a visualization of object speeds as colored dots
+    - input: frame_shape (tuple), tracked_objects (list), object_speeds (dict)
+    - output: canvas with speed dots (numpy array)
+    """
+
     # Create an empty canvas
     canvas = np.zeros(frame_shape, dtype=np.uint8)
     for obj in tracked_objects:
@@ -281,6 +366,13 @@ def create_speed_dots(frame_shape, tracked_objects, object_speeds):
     return canvas
 
 def visualize_speed_areas(frame_shape, tracked_objects, object_speeds, critical_positions, crossed_objects, count_roi_colors):
+    """
+    This function creates a visualization of speed areas with a color-coded grid
+    - input: frame_shape (tuple), tracked_objects (list), object_speeds (dict),
+             critical_positions (dict), crossed_objects (dict), count_roi_colors (dict)
+    - output: canvas with visualized speed areas and legend (numpy array)
+    """
+
     # Create an empty canvas
     canvas = np.zeros(frame_shape, dtype=np.uint8)
     grid_size = 40
@@ -355,6 +447,12 @@ def visualize_speed_areas(frame_shape, tracked_objects, object_speeds, critical_
     return canvas_with_legend
 
 def draw_counts_near_roi(frame, critical_positions, crossed_objects, count_roi_colors):
+    """
+    This function draws object counts near ROI lines
+    - input: frame (numpy array), critical_positions (dict), crossed_objects (dict), count_roi_colors (dict)
+    - output: None (modifies frame in-place)
+    """
+
     for pos, data in critical_positions.items():
         count_roi = data['count_roi']
         points = data['points']
@@ -373,6 +471,15 @@ def draw_counts_near_roi(frame, critical_positions, crossed_objects, count_roi_c
 ##### ------------------------------------- main workflow -----------------------------------------------
 
 def process_video(video_path, output_video_path, trail_video_path, speed_heatmap_path, master_analysis_path, create_trail):
+    """
+    This function processes the input video, performs object detection and tracking,
+    and generates various output videos with analytics
+    - input: video_path (string), output_video_path (string), trail_video_path (string),
+             speed_heatmap_path (string), master_analysis_path (string), create_trail (boolean)
+    - output: None (generates output video files)
+    """
+
+
     print("Starting video processing...")
     
     # Open the input video
