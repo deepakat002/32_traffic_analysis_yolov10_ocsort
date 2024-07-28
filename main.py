@@ -390,6 +390,15 @@ def visualize_speed_areas(frame_shape, tracked_objects, object_speeds, critical_
         if 0 <= grid_y < grid_speeds.shape[0] and 0 <= grid_x < grid_speeds.shape[1]:
             grid_speeds[grid_y, grid_x] += speed
             grid_counts[grid_y, grid_x] += 1
+        """
+        Example:
+        Let's say we have a 1280x720 pixel frame, which gives us a 32x18 grid of 40x40 pixel cells.
+        If an object is detected with a bounding box of (160, 200, 200, 240):
+
+        Center point: (180, 220)
+        Grid indices: x = 180 // 40 = 4, y = 220 // 40 = 5
+        If this is within bounds, grid_counts[5][4] is incremented by 1 and grid_speeds[5][4] will be increamented by speed
+        """
 
     # Define speed ranges and corresponding colors
     speed_ranges = [
@@ -468,6 +477,50 @@ def draw_counts_near_roi(frame, critical_positions, crossed_objects, count_roi_c
         # Draw count label near ROI
         cv2.putText(frame, f"pos-{pos[-1]}/count: {count}", label_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, roi_color, 2)
 
+
+def draw_grid_overlay(frame, grid_size=40, output_path='grid_overlay.jpg'):
+    """
+    Draw a grid overlay on the input frame and save it.
+    
+    Args:
+    frame (numpy.ndarray): Input frame
+    grid_size (int): Size of each grid cell in pixels
+    output_path (str): Path to save the output image
+    
+    Returns:
+    None
+    """
+    height, width = frame.shape[:2]
+    overlay = frame.copy()
+    
+    # Draw vertical lines (blue)
+    for x in range(0, width, grid_size):
+        cv2.line(overlay, (x, 0), (x, height), (255, 0, 0), 1)
+        # Add x-axis grid numbers
+        for y in range(0, height, grid_size):
+            if x//grid_size != 0:
+                cv2.putText(overlay, f'{x//grid_size}', (x+2, y+15), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,255,0), 2)
+
+    # Draw horizontal lines (red)
+    for y in range(0, height, grid_size):
+        cv2.line(overlay, (0, y), (width, y), (0, 0, 255), 1)
+        # Add y-axis grid numbers
+        cv2.putText(overlay, f'{y//grid_size}', (2, y+15), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 2)
+
+    # Blend the original frame and the overlay
+    result = cv2.addWeighted(overlay, 0.6, frame, 0.4, 0)
+    
+    # Add grid size information
+    cv2.putText(result, f'Grid Size: {grid_size}x{grid_size} pixels', (10, height - 20), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+    # Save the result
+    cv2.imwrite(output_path, result)
+    print(f"Grid overlay image saved to {output_path}")
+
+
 ##### ------------------------------------- main workflow -----------------------------------------------
 
 def process_video(video_path, output_video_path, trail_video_path, speed_heatmap_path, master_analysis_path, create_trail):
@@ -517,6 +570,7 @@ def process_video(video_path, output_video_path, trail_video_path, speed_heatmap
     object_speeds = {}
 
     frame_count = 0
+    grid_overlay_saved = False
     print("Starting main processing loop...")
 
     # Main video processing loop
@@ -524,7 +578,11 @@ def process_video(video_path, output_video_path, trail_video_path, speed_heatmap
         ret, frame = cap.read()
         if not ret:
             break
-
+        # Save grid overlay for the first frame
+        if not grid_overlay_saved:
+            grid_overlay_path = os.path.join(output_folder, f"{input_file_name_no_ext}_grid_overlay.jpg")
+            draw_grid_overlay(frame, grid_size=40, output_path=grid_overlay_path)
+            grid_overlay_saved = True
         # Detect objects in the current frame
         detections = detect_objects(frame)
         
@@ -534,7 +592,7 @@ def process_video(video_path, output_video_path, trail_video_path, speed_heatmap
         # Draw blinking count ROI on the frame
         draw_blinking_count_roi(frame, blink_state)
 
-        speed_heatmap_data = [] 
+        # speed_heatmap_data = [] 
         # Process each tracked object
         for obj in tracked_objects:
             # Extract object information
@@ -558,7 +616,7 @@ def process_video(video_path, output_video_path, trail_video_path, speed_heatmap
             speed = object_speeds[obj_id]['speed']
             cv2.putText(frame, f"{model.names[int(cls)]}:{obj_id}/{speed:.1f}kmph", (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
-            speed_heatmap_data.append(((centroid_x, centroid_y), speed))
+            # speed_heatmap_data.append(((centroid_x, centroid_y), speed))
 
             # Check if object crosses critical positions
             for pos, data in critical_positions.items():
@@ -595,6 +653,16 @@ def process_video(video_path, output_video_path, trail_video_path, speed_heatmap
                 blink_frames[pos] -= 1
                 if blink_frames[pos] <= 0:
                     blink_state[pos] = False
+        """
+            Example:
+        If an object crosses the ROI line for position1 at frame 100, and the video is 30 fps:
+
+        At frame 100: blink_state['position1'] is set to True, blink_frames['position1'] is set to 30.
+        Frames 101-129: The ROI line for position1 is drawn in white (blinking).
+        Frame 130: blink_frames['position1'] reaches 0, blink_state['position1'] is set back to False.
+        Frame 131 onwards: The ROI line for position1 is drawn in its normal color again.
+        
+        """
 
         # Display counts on the frame
         y_offset = 30
@@ -625,13 +693,13 @@ def process_video(video_path, output_video_path, trail_video_path, speed_heatmap
             combo_frame = np.hstack((frame, canvas_copy))
             combo_out.write(combo_frame)
 
-        # Update grid counts for heatmap
-        for obj in tracked_objects:
-            x1, y1, x2, y2, obj_id, _, cls, _ = obj
-            grid_x = int((x1 + x2) / 2 / 40)
-            grid_y = int((y1 + y2) / 2 / 40)
-            if 0 <= grid_x < grid_counts.shape[1] and 0 <= grid_y < grid_counts.shape[0]:
-                grid_counts[grid_y, grid_x] += 1
+        # # Update grid counts for heatmap
+        # for obj in tracked_objects:
+        #     x1, y1, x2, y2, obj_id, _, cls, _ = obj
+        #     grid_x = int((x1 + x2) / 2 / 40)
+        #     grid_y = int((y1 + y2) / 2 / 40)
+        #     if 0 <= grid_x < grid_counts.shape[1] and 0 <= grid_y < grid_counts.shape[0]:
+        #         grid_counts[grid_y, grid_x] += 1
 
         # Write frames to output videos
         out.write(frame)
@@ -669,6 +737,6 @@ def process_video(video_path, output_video_path, trail_video_path, speed_heatmap
     print("Video processing completed")
 
 if __name__ == "__main__":
-    print("Processing started")
+    print("Processing started.")
     process_video(video_path, output_video_path, trail_video_path, speed_heatmap_path, master_analysis_path, create_trail)
     print("Processing completed.")
