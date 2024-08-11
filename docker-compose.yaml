@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  pytraffic:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: "trafficyolo:1.0"
+    container_name: trafficx
+    privileged: true
+
+    volumes:
+      - /e/YOUTUBE_CODES/32_traffic_analysis_yolov10_ocsort/model_weights:/trafficyolo/model_weights
+      - /e/YOUTUBE_CODES/32_traffic_analysis_yolov10_ocsort/videos:/trafficyolo/videos
+      - /e/YOUTUBE_CODES/32_traffic_analysis_yolov10_ocsort/output:/trafficyolo/output
+      # - /e/YOUTUBE_CODES/32_traffic_analysis_yolov10_ocsort/pyscripts:/trafficyolo/pyscripts
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+
+    working_dir: /trafficyolo
+    command: python3 main.py
