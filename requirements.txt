@@ -26,3 +26,4 @@ ftfy
 regex
 lap
 filterpy
+numpy==1.26.4

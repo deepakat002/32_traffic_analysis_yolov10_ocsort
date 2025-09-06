@@ -25,4 +25,5 @@ services:
               capabilities: [ gpu ]
 
     working_dir: /trafficyolo
-    command: python3 main.py
+    # command: python3 main.py
+    command: sleep infinity

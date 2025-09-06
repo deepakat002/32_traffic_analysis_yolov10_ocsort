@@ -9,7 +9,7 @@ RUN mkdir /trafficyolo
 WORKDIR /trafficyolo
 
 COPY requirements.txt .
-COPY pyscripts .
+COPY pyscripts . 
 RUN ls -lh
 
 RUN pip install -r requirements.txt
