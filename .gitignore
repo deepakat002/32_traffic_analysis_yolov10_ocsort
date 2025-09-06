@@ -55,3 +55,6 @@ boxmot/motion/cmc/*.jpg
 output
 videos
 __pycache__
+
+model_weights
+output_old
